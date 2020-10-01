@@ -46,6 +46,7 @@ const getThickness = function (i) {
   // initally start with no glacier and see what happens
   return 0;
 };
+// eslint-disable-next-line
 for (var i = 0; i < col; i++) {
   thickness[i] = getThickness(i);
 }
