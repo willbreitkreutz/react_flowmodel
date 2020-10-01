@@ -67,7 +67,7 @@ const getFlux = function (Hu, Hd) {
   let D = Afl * H ** (n + 2) * Math.abs(dH / dx) ** (n - 1);
   // get the flux between columns, I don't think this is quite right
   // D = D > 1 ? 1 : D;
-  return D * 0.5 * dH * dx;
+  return D * (dH / dx);
 };
 
 const getFluxUpstream = function (i) {
