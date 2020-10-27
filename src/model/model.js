@@ -1,13 +1,16 @@
-// var fs = require("fs");
+import bed from "./bed-filtered.json";
+import iceCache from "./annual-out/node-ice-850.json";
+const usecache = false;
+// var bed = require("./bed-filtered.json");
 /**
  * MODEL PARAMETERS
  * Ok, here we go, first we lay out all of our terms
  */
 // define our model domain, the number of columns in the x direction
-const col = 100;
+const col = 1000;
 
 // define the length of our model domain in kilometers
-const len = 100;
+const len = 75;
 
 // so our change in x for each column is:
 const dx = (len / col) * 1000; // meters
@@ -40,46 +43,67 @@ for (var i = 0; i < col; i++) {
 /**
  * INITIAL GLACIER PROPERTIES
  */
-// the initial thickness of our glacier
-let thickness = [];
-const getThickness = function (i) {
-  // initally start with no glacier and see what happens
-  return 0;
+// the ground surface elevation
+let base = [];
+bed.reverse();
+const getBase = function (i) {
+  return bed[i];
 };
 // eslint-disable-next-line
 for (var i = 0; i < col; i++) {
-  thickness[i] = getThickness(i);
+  base[i] = getBase(i);
+}
+
+// the initial ice elevation of our glacier
+let ice = [];
+const getIce = function (i) {
+  // initally start with no glacier and see what happens
+  if (usecache) {
+    return iceCache[i];
+  } else {
+    return 0;
+  }
+};
+// eslint-disable-next-line
+for (var i = 0; i < col; i++) {
+  ice[i] = getIce(i);
 }
 
 // create a copy of thickness that we can use as a staging location for each timestep
-let thicknessNext = [...thickness];
+let iceNext = [...ice];
 
 /**
  * PROCESSING
  */
-const getFlux = function (Hu, Hd) {
+const getFlux = function (Hu, Hd, hu, hd) {
   // if there's no ice, bail
   if (!Hu && !Hd) return 0;
-  // what is our change in thickness from upstream to down (negative means upstream is higher)
-  const dH = Hd - Hu; // m
+  // what is our surface slope from upstream to down (negative means upstream is higher)
+  const dh = hd - hu; // m
   // use the mean thickness for big H
   const H = (Hd + Hu) / 2; // m
   // calculate our diffusivity between these columns
-  let D = Afl * H ** (n + 2) * Math.abs(dH / dx) ** (n - 1);
+  let D = Afl * H ** (n + 2) * Math.abs(dh / dx) ** (n - 1);
   // get the flux between columns, I don't think this is quite right
-  // D = D > 1 ? 1 : D;
-  return D * (dH / dx);
+  return D * (dh / dx);
 };
 
 const getFluxUpstream = function (i) {
   if (i === 0) return 0;
-  const f = -1 * getFlux(thickness[i - 1], thickness[i]);
+  const f =
+    -1 *
+    getFlux(ice[i - 1] - base[i - 1], ice[i] - base[i], ice[i - 1], ice[i]);
   return f;
 };
 
 const getFluxDownstream = function (i) {
   if (i === col - 1) return 0;
-  const f = getFlux(thickness[i], thickness[i + 1]);
+  const f = getFlux(
+    ice[i] - base[i],
+    ice[i + 1] - base[i + 1],
+    ice[i],
+    ice[i + 1]
+  );
   return f;
 };
 
@@ -100,17 +124,26 @@ const getTotalFlux = function (i) {
  * LOOP
  */
 function start(onChange) {
-  const dt = 1 / 365; // years
+  let t = 0;
+  const dt = 1 / 365 / 2; // years
   return window.setInterval(() => {
+    // return setInterval(() => {
     for (var i = 0; i < col; i++) {
-      const H = thickness[i];
+      const H = ice[i] - base[i];
       const flux = getTotalFlux(i);
       let newH = H + (flux / dx) * dt;
-      thicknessNext[i] = newH < 0 ? 0 : newH;
+      iceNext[i] = newH < 0 ? base[i] : newH + base[i];
     }
-    thickness = [...thicknessNext];
-    if (onChange && typeof onChange === "function") onChange(thickness);
+    t++;
+    ice = [...iceNext];
+    if (onChange && typeof onChange === "function") {
+      if (ice.includes(NaN)) {
+        console.log(ice);
+      }
+      if (t % (365 * 2) === 0) onChange({ ice, base, massBalance });
+    }
   }, 1);
 }
 
 export default start;
+// module.exports = start;

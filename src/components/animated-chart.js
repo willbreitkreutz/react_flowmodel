@@ -3,20 +3,11 @@ import { connect } from "redux-bundler-react";
 import Plot from "react-plotly.js";
 
 export default connect(
-  "doModelRun",
-  "doModelStop",
-  "selectModelTime",
-  "selectModelRevision",
-  "selectModelData",
-  "selectModelMidpointData",
-  ({
-    doModelRun,
-    doModelStop,
-    modelTime,
-    modelRevision: revision,
-    modelData,
-    modelMidpointData: modelMidpoints,
-  }) => {
+  "selectAnimateCurrentData",
+  ({ animateCurrentData: dataframe }) => {
+    if (!dataframe) return null;
+    const { i, t, modelData, modelMidpoints } = dataframe;
+
     const [data, setData] = useState([]);
     const [layout, setLayout] = useState({});
     const [config, setConfig] = useState({});
@@ -52,16 +43,6 @@ export default connect(
           marker: { color: "#e4b3f5" },
         },
         {
-          x: modelData.diffusivity_down.x,
-          y: modelData.diffusivity_down.y,
-          name: "Diffusivity",
-          type: "scattergl",
-          mode: "lines",
-          xaxis: "x",
-          yaxis: "y3",
-          marker: { color: "#ed32e1" },
-        },
-        {
           x: modelData.flux_up.x,
           y: modelData.flux_up.y,
           name: "Flux (up)",
@@ -90,7 +71,7 @@ export default connect(
           type: "scattergl",
           mode: "lines",
           xaxis: "x",
-          yaxis: "y6",
+          yaxis: "y9",
           marker: { color: "#0abac9" },
         },
         {
@@ -100,8 +81,8 @@ export default connect(
           type: "scattergl",
           mode: "lines",
           xaxis: "x",
-          yaxis: "y7",
-          marker: { color: "#0abac9" },
+          yaxis: "y6",
+          marker: { color: "#db0948" },
         },
         {
           x: modelMidpoints.diffusivity.x,
@@ -110,8 +91,8 @@ export default connect(
           type: "scattergl",
           mode: "lines",
           xaxis: "x",
-          yaxis: "y8",
-          marker: { color: "#0abac9" },
+          yaxis: "y7",
+          marker: { color: "#500c87" },
         },
         {
           x: modelMidpoints.slope.x,
@@ -120,18 +101,8 @@ export default connect(
           type: "scattergl",
           mode: "lines",
           xaxis: "x",
-          yaxis: "y9",
-          marker: { color: "#0abac9" },
-        },
-        {
-          x: modelMidpoints.flux.x,
-          y: modelMidpoints.flux.y,
-          name: "Midpoint Flux",
-          type: "scattergl",
-          mode: "lines",
-          xaxis: "x",
-          yaxis: "y10",
-          marker: { color: "#0abac9" },
+          yaxis: "y8",
+          marker: { color: "#0b9917" },
         },
         {
           x: modelData.deltaH.x,
@@ -140,8 +111,8 @@ export default connect(
           type: "scattergl",
           mode: "lines",
           xaxis: "x",
-          yaxis: "y11",
-          marker: { color: "#0abac9" },
+          yaxis: "y10",
+          marker: { color: "#0b7899" },
         },
       ]);
     }, [modelData, modelMidpoints]);
@@ -152,41 +123,34 @@ export default connect(
         title: "Flowline",
         dragmode: "pan",
         grid: {
-          rows: 11,
+          rows: 9,
           columns: 1,
           subplots: [
             ["xy"],
             ["xy2"],
-            ["xy3"],
             ["xy4"],
             ["xy5"],
+            ["xy9"],
             ["xy6"],
             ["xy7"],
             ["xy8"],
-            ["xy9"],
             ["xy10"],
-            ["xy11"],
           ],
         },
         xaxis: {
-          title: "Distance Along Centerline in Meters",
+          title: "Distance Along Centerline in Model Columns",
           rangemode: "tozero",
         },
         yaxis: {
           title: "Elevation (m)",
           rangemode: "tozero",
-          range: [0, 1500],
+          range: [0, 3000],
         },
         yaxis2: {
           title: {
-            text: "Mass balance Flux (m²)",
+            text: "Mass balance Flux (m)",
           },
           rangemode: "tozero",
-        },
-        yaxis3: {
-          title: {
-            text: "Diffusivity (down)",
-          },
         },
         yaxis4: {
           title: {
@@ -198,32 +162,27 @@ export default connect(
             text: "Flux (down)",
           },
         },
-        yaxis6: {
+        yaxis9: {
           title: {
             text: "Lateral Flux",
           },
         },
-        yaxis7: {
+        yaxis6: {
           title: {
             text: "Flux (total)",
           },
         },
-        yaxis8: {
+        yaxis7: {
           title: {
             text: "Diffusivity",
           },
         },
-        yaxis9: {
+        yaxis8: {
           title: {
             text: "Slope",
           },
         },
         yaxis10: {
-          title: {
-            text: "Flux",
-          },
-        },
-        yaxis11: {
           title: {
             text: "DeltaH",
           },
@@ -254,20 +213,12 @@ export default connect(
 
     return (
       <div>
-        <div className="btn-group">
-          <button onClick={doModelRun} className="btn btn-lg btn-primary">
-            Start
-          </button>
-          <button onClick={doModelStop} className="btn btn-lg btn-secondary">
-            Stop
-          </button>
-        </div>
-        <p>{`${modelTime} years`}</p>
+        <p>{`${t} years, ${i} model iterations`}</p>
         <Plot
           onInitialized={handleUpdate}
           onUpdate={handleUpdate}
-          revision={revision}
-          style={{ width: "100%", height: "1800px" }}
+          revision={i}
+          style={{ width: "100%", height: "1500px" }}
           data={data}
           layout={layout}
           config={config}

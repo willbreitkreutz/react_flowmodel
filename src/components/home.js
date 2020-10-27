@@ -1,11 +1,28 @@
 import React from "react";
+import ModelSelector from "./model-selector";
+import AnimateControls from "./animate-controls";
+import AnimatedChart from "./animated-chart";
 import Chart from "./chart";
 
 export default () => {
   return (
     <div className="container-fluid">
-      <h2>Shallow Ice Approximation Flow Model</h2>
-      <Chart />
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          width: "50%",
+          zIndex: 9999,
+          backgroundColor: "rgba(255,255,255,0.5)",
+        }}
+      >
+        <h2>Shallow Ice Approximation Flow Model</h2>
+        <ModelSelector />
+        <AnimateControls />
+      </div>
+      <div style={{ marginTop: "250px" }}></div>
+      <AnimatedChart />
+      {/* <Chart /> */}
       <h5>References</h5>
       <p>
         <small className="text-muted">

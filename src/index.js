@@ -10,6 +10,7 @@ import "./css/mdi/css/materialdesignicons.min.css";
 import "./css/index.css";
 
 window.localStorage.removeItem("debug");
+// window.localStorage.setItem("debug", true);
 
 cache.getAll().then((initialData) => {
   const store = getStore(initialData);
