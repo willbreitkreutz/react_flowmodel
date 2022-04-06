@@ -122,6 +122,8 @@ class FlowModel {
     for (var i = 0; i < this.colCount; i++) {
       this.baseElevation[i] = generateBaseElevationFn(i);
     }
+
+    console.log("model configured");
   }
 
   getFlux = (Hu, Hd, hu, hd) => {
@@ -172,30 +174,35 @@ class FlowModel {
   };
 
   start = () => {
-    this.timer = setInt(() => {
-      this.calculateLateralFluxes();
-      for (let i = 0; i < this.colCount; i++) {
-        const H = this.iceElevation[i] - this.baseElevation[i];
-        const flux = this.getTotalFlux(i);
-        this.nextFlux[i] = (flux / this.dx) * this.dt;
-        let newH = H + (flux / this.dx) * this.dt;
-        this.nextIce[i] =
-          newH < 0 ? this.baseElevation[i] : newH + this.baseElevation[i];
-      }
-      this.t++;
-      this.iceElevation = [...this.nextIce];
-      this.fluxes = [...this.nextFlux];
-      if (this.onChange && typeof this.onChange === "function") {
-        if (this.t % this.changeInterval === 0)
-          this.onChange({
-            t: this.t,
-            ice: this.iceElevation,
-            base: this.baseElevation,
-            massBalance: this.massBalance,
-            fluxes: this.fluxes,
-          });
-      }
-    }, 1);
+    console.log("model starting");
+    try {
+      this.timer = setInt(() => {
+        this.calculateLateralFluxes();
+        for (let i = 0; i < this.colCount; i++) {
+          const H = this.iceElevation[i] - this.baseElevation[i];
+          const flux = this.getTotalFlux(i);
+          this.nextFlux[i] = (flux / this.dx) * this.dt;
+          let newH = H + (flux / this.dx) * this.dt;
+          this.nextIce[i] =
+            newH < 0 ? this.baseElevation[i] : newH + this.baseElevation[i];
+        }
+        this.t++;
+        this.iceElevation = [...this.nextIce];
+        this.fluxes = [...this.nextFlux];
+        if (this.onChange && typeof this.onChange === "function") {
+          if (this.t % this.changeInterval === 0)
+            this.onChange({
+              t: this.t,
+              ice: this.iceElevation,
+              base: this.baseElevation,
+              massBalance: this.massBalance,
+              fluxes: this.fluxes,
+            });
+        }
+      }, 1);
+    } catch (e) {
+      console.log(e);
+    }
   };
 }
 

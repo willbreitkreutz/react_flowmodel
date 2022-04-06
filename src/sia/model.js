@@ -12,12 +12,12 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * 1D Simple Ice Approximation Flow Model
+ * 1D Shallow Ice Approximation Flow Model
  * by @willbreitkreutz
  *
  * Implemented as a JS class.
  *
- * Using:
+ * Usage:
  *
  * ```
  * const model = new FlowModel(config);
@@ -39,20 +39,51 @@ class FlowModel {
    * will run, but you wont see any output, it'll just be doing the work for the fun of it.
    */
   constructor(props) {
+    // Flags
+    this.sliding = props.sliding || false;
+
+    // Defaults
+    const defaults = {
+      A: 3e-16,
+      As: 73,
+      n: 3,
+      p: 917,
+      g: 9.81,
+      Wb: 250, // half-width, in meters
+      modelLength: 100, // in KM, important because we convert to meters below
+      elementCount: 200,
+      iterationsPerYear: 365,
+      iceConstructor: function () {
+        return 0;
+      },
+      bedConstructor: function () {
+        return 0;
+      },
+      massBalanceFunc: null,
+      onChange: function (data) {
+        // doing nothing right now
+      },
+    };
+
+    const config = Object.assign({}, defaults, props);
+
     // Flow law constants
-    this.A = props.A || 10e-16; // Ice softness
-    this.n = props.n || 3; // Glen's n
-    this.p = props.p || 917; // Density of Ice
-    this.g = props.g || 9.81; // Gravitational acceleration
+    this.A = config.A; // Ice softness
+    // A_s such that if Tb =100 kPa and HAB=100 m, Us=1000 myr, from their chart === 10000
+    this.As = config.As; // Sliding Parameter
+    this.n = config.n; // Glen's n
+    this.p = config.p; // Density of Ice
+    this.g = config.g; // Gravitational acceleration
+    this.Wb = config.Wb; // Half width at the base in meters
 
     // Calculate our constant soup for diffusivity, this way you only do the math once
     this.Afl = (2 * this.A * (this.p * this.g) ** this.n) / (this.n + 2);
 
     // Set up our model domain
-    this.modelLength = props.modelLength || 100; // kilometers
-    this.elementCount = props.elementCount || 200; // number of ice columns being modeled
+    this.modelLength = config.modelLength; // kilometers
+    this.elementCount = config.elementCount; // number of ice columns being modeled
     this.dx = (this.modelLength / this.elementCount) * 1000; // change in the x direction in METERS between ice column midpoints
-    this.iterationsPerYear = props.iterationsPerYear || 365; // default to once a day
+    this.iterationsPerYear = config.iterationsPerYear; // default to once a day
 
     // Internal time tracking stuff
     this.iteration = 0; // current model iteration
@@ -65,23 +96,10 @@ class FlowModel {
     this.midpoints = []; // container for midpoints, where we do diffusivity
 
     // Set up any user-provided boundary / initial state calculators
-    this.iceConstructor =
-      props.iceConstructor ||
-      function () {
-        return 0;
-      };
-
-    this.bedConstructor =
-      props.bedConstructor ||
-      function () {
-        return 0;
-      };
-
-    this.onChange =
-      props.onChange ||
-      function (data) {
-        // doing nothing right now
-      };
+    this.iceConstructor = config.iceConstructor;
+    this.bedConstructor = config.bedConstructor;
+    this.massBalanceFunc = config.massBalanceFunc || this.getMassBalanceGeneric;
+    this.onChange = config.onChange;
 
     // Run our initial state constructors to set up any initial conditions
     // See these methods below
@@ -111,6 +129,7 @@ class FlowModel {
         massBalanceFlux: 0,
         iteration: 0,
         deltaH: 0,
+        velocity: 0,
       };
     }
   };
@@ -126,6 +145,7 @@ class FlowModel {
         diffusivity: 0,
         slope: 0,
         flux: 0,
+        velocity: 0,
       };
     }
   };
@@ -178,7 +198,24 @@ class FlowModel {
       const H = (thicknessDown + thicknessUp) / 2;
 
       // calculate diffusivity
-      const D = this.Afl * H ** (this.n + 2) * Math.abs(slope) ** (this.n - 1);
+      const D =
+        H ** 4 *
+        Math.abs(slope) ** 2 *
+        ((2 / 5) * this.A * (this.p * this.g) ** 3 * H * (2 * this.Wb) +
+          this.As * (2 * this.Wb));
+      // const D = this.sliding
+      //   ? H ** (this.n + 1) *
+      //     Math.abs(slope) ** (this.n - 1) *
+      //     (this.Afl * H * (2 * this.Wb) + this.As * (2 * this.Wb))
+      //   : this.Afl * H ** (this.n + 2) * Math.abs(slope) ** (this.n - 1);
+
+      // calculate depth averaged velocity
+      const U =
+        -1 *
+        this.Afl *
+        H ** (this.n + 1) *
+        Math.abs(slope) ** (this.n - 1) *
+        slope;
 
       // calculate flux in the downstream direction
       const flux = D * slope; // going to be a negative number if slope is downstream
@@ -187,6 +224,7 @@ class FlowModel {
       midpoint.diffusivity = D;
       midpoint.slope = slope;
       midpoint.flux = flux;
+      midpoint.velocity = U;
 
       // populate our element on the upstream side
       elementUp.diffusivity_down = D; // store our diffusivity for plotting
@@ -196,6 +234,7 @@ class FlowModel {
       elementDown.diffusivity_up = D; // store our diffusivity for plotting
       elementDown.flux_up = -1 * flux; // make flux_up positive since it's an incoming value
 
+      // if we get a busted diffusivity then it means our model is unstable
       if (isNaN(D)) {
         this.pause();
         console.log(midpoint);
@@ -206,11 +245,11 @@ class FlowModel {
   /**
    * Calculate our mass balance flux, we take a precipitation value
    * and then multiply by this.dx to get a quantity so that we can plot
-   * it and see the actual change in area that it accounts for
+   * the total flux as a quantity and see the actual change that it accounts for
    */
-  getMassBalance = (i) => {
+  getMassBalanceGeneric = (i) => {
     const y = 2 - (i / (0.4 * this.elementCount)) ** 3;
-    return y * this.dx;
+    return y * this.dx * 2 * this.Wb;
   };
 
   /**
@@ -221,11 +260,24 @@ class FlowModel {
    * This version adds some janky seasonality to the thing, basically we cycle
    * our equilibrium point up and down the line every 500 years
    */
-  getMassBalanceSeasonal = (i) => {
+  getMassBalanceIceAge = (i) => {
     let iceAgeCoef = Math.sin((Math.ceil(this.t) / 500) * (2 * Math.PI));
     iceAgeCoef = Math.round(iceAgeCoef * 100) / 100;
     const y = 2 - (i / ((0.3 + 0.2 * iceAgeCoef) * this.elementCount)) ** 3;
-    return y * this.dx;
+    return y * this.dx * 2 * this.Wb;
+  };
+
+  /**
+   * Get mass balance using our built in generic function or a user provided one
+   * Calls the mass balance function with the location along the flowline and
+   * the current month
+   */
+  getMassBalance = (i) => {
+    const month = Math.floor(
+      ((this.iteration % this.iterationsPerYear) / this.iterationsPerYear) * 12
+    );
+    const year = Math.floor(this.iteration / this.iterationsPerYear);
+    return this.massBalanceFunc(i, month, year);
   };
 
   /**
@@ -247,21 +299,28 @@ class FlowModel {
       element.iteration = element.iteration + 1;
 
       // get our mass balance
-      element.massBalanceFlux = this.getMassBalanceSeasonal(i);
+      element.massBalanceFlux = this.getMassBalance(i);
 
       // get our total flux
       element.totalFlux =
         element.flux_up + element.flux_down + element.massBalanceFlux;
 
       // convert total flux to a change in thickness and add that to our ice elevation
-      element.deltaH = (element.totalFlux / this.dx) * this.dt; // get the change within our timestep
+      element.deltaH = (element.totalFlux / this.dx / (2 * this.Wb)) * this.dt; // get the change within our timestep
 
-      // pdate our element, if our ice is no taller than our bed, then keep bed elevation
+      // update our element, if our ice is no taller than our bed, then keep bed elevation
       const newIceElevation = element.iceElevation + element.deltaH;
       element.iceElevation =
         newIceElevation <= element.bedElevation
           ? element.bedElevation
           : newIceElevation;
+
+      // convert total flux to a velocity
+      const H = element.iceElevation - element.bedElevation;
+      element.velocity =
+        H > 0
+          ? (element.totalFlux / H / (2 * this.Wb)) * this.iterationsPerYear
+          : 0;
     }
   };
 
@@ -296,7 +355,7 @@ class FlowModel {
         midpoints: [...this.midpoints],
       });
       // do it all again...
-    }, 1);
+    }, 0);
   };
 }
 

@@ -21,8 +21,14 @@ export default connect(
           y: modelData.iceElevation.y,
           name: "Ice Surface",
           type: "scattergl",
-          mode: "lines",
-          marker: { color: "blue" },
+          mode: "lines+markers",
+          marker: {
+            size: 5,
+            colorscale: "Bluered",
+            color: modelData.velocity.y.map((y, i) => {
+              return y;
+            }),
+          },
         },
         {
           x: modelData.bedElevation.x,
@@ -33,13 +39,43 @@ export default connect(
           marker: { color: "brown" },
         },
         {
+          x: modelData.waterElevation.x,
+          y: modelData.waterElevation.y,
+          name: "Water",
+          type: "scattergl",
+          mode: "lines",
+          marker: { color: "rgba(0, 230, 0, 0.5)" },
+        },
+        {
+          x: modelData.iceElevation.x,
+          y: modelData.iceElevation.y.map((ice, i) => {
+            return ice - modelData.bedElevation.y[i];
+          }),
+          name: "Thickness",
+          type: "scattergl",
+          mode: "lines",
+          xaxis: "x",
+          yaxis: "y2",
+          marker: { color: "purple" },
+        },
+        {
+          x: modelMidpoints.velocity.x,
+          y: modelMidpoints.velocity.y,
+          name: "Midpoint Velocity",
+          type: "scattergl",
+          mode: "lines",
+          xaxis: "x",
+          yaxis: "y11",
+          marker: { color: "purple" },
+        },
+        {
           x: modelData.massBalanceFlux.x,
           y: modelData.massBalanceFlux.y,
           name: "Mass Balance",
           type: "scattergl",
           mode: "lines",
           xaxis: "x",
-          yaxis: "y2",
+          yaxis: "y3",
           marker: { color: "#e4b3f5" },
         },
         {
@@ -123,11 +159,13 @@ export default connect(
         title: "Flowline",
         dragmode: "pan",
         grid: {
-          rows: 9,
+          rows: 11,
           columns: 1,
           subplots: [
             ["xy"],
             ["xy2"],
+            ["xy11"],
+            ["xy3"],
             ["xy4"],
             ["xy5"],
             ["xy9"],
@@ -147,6 +185,11 @@ export default connect(
           range: [0, 3000],
         },
         yaxis2: {
+          title: {
+            text: "Thickness (m)",
+          },
+        },
+        yaxis3: {
           title: {
             text: "Mass balance Flux (m)",
           },
@@ -185,6 +228,11 @@ export default connect(
         yaxis10: {
           title: {
             text: "DeltaH",
+          },
+        },
+        yaxis11: {
+          title: {
+            text: "Velocity (m/yr)",
           },
         },
       });

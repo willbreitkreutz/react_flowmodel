@@ -2,7 +2,6 @@ import React from "react";
 import ModelSelector from "./model-selector";
 import AnimateControls from "./animate-controls";
 import AnimatedChart from "./animated-chart";
-import Chart from "./chart";
 
 export default () => {
   return (
@@ -17,6 +16,9 @@ export default () => {
         }}
       >
         <h2>Shallow Ice Approximation Flow Model</h2>
+        <small>
+          <a href="/compare">Comparison</a>
+        </small>
         <ModelSelector />
         <AnimateControls />
       </div>

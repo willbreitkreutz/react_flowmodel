@@ -1,13 +1,13 @@
 import React from "react";
 import { Provider } from "redux-bundler-react";
-import Home from './components/home'
+import MainContainer from "./components/main-container";
 
 class App extends React.Component {
   render() {
     const { store } = this.props;
     return (
       <Provider store={store}>
-        <Home />
+        <MainContainer />
       </Provider>
     );
   }
